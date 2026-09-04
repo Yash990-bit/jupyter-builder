@@ -16,6 +16,7 @@ from jupyter_builder.federated_extensions import (
     _check_node_version,
     _ensure_builder,
     _read_rspack_node_range,
+    _satisfies_allowing_prerelease,
 )
 
 
@@ -1022,6 +1023,35 @@ def test_check_node_version_raises_on_old_node(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match=r"requires Node\.js .* \(found v18\.20\.8\)"):
         _check_node_version(str(ext_path), str(ext_path))
+
+
+@pytest.mark.parametrize(
+    ("version", "expected"),
+    [
+        # A prerelease of a version newer than the range is new enough to build.
+        ("26.8.0-alpha.0.0.0", True),
+        ("22.13.0-nightly1", True),
+        ("20.19.1-alpha.1", True),
+        # A prerelease of the oldest supported version predates it, so it is not.
+        ("22.12.0-alpha.1", False),
+        ("20.19.0-alpha.1", False),
+        # Prereleases must not widen the range itself, including under an
+        # upper bound: 21.0.0-alpha.1 is <21.0.0, but 21.0.0 is excluded.
+        ("21.0.0-alpha.1", False),
+        ("21.7.3-alpha.1", False),
+        ("18.20.8-alpha.1", False),
+        # Stable versions keep behaving as before.
+        ("26.8.0", True),
+        ("22.12.0", True),
+        ("20.19.0", True),
+        ("21.7.3", False),
+        ("18.20.8", False),
+        # Unparsable versions are rejected.
+        ("not-a-version", False),
+    ],
+)
+def test_satisfies_allowing_prerelease(version, expected):
+    assert _satisfies_allowing_prerelease(version, "^20.19.0 || >=22.12.0") is expected
 
 
 def test_check_node_version_passes_on_supported_node(tmp_path, monkeypatch):
