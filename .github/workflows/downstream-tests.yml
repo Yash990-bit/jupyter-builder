@@ -3,6 +3,9 @@ name: Downstream Tests
 on:
   pull_request:
 
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   downstream:
     runs-on: ubuntu-latest
