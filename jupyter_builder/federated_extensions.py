@@ -459,11 +459,17 @@ def _ensure_builder(ext_path: str, core_package_file: str) -> tuple[str, str]:
         raise ValueError(msg)
     dep_version2 = cast("str", dep_version2)
 
-    # if we have installed from disk (version is a path), assume we know what
-    # we are doing and do not check versions.
-    if "/" in dep_version2:
-        with (Path(ext_path) / dep_version2 / "package.json").open() as fid:
-            dep_version2 = str(json.load(fid).get("version", ""))
+    # If the dependency is a local path (e.g. file:, link:, portal: or relative path),
+    # try reading the version from its package.json if present.
+    prefix, _, remainder = dep_version2.partition(":")
+    clean_path = remainder if prefix in ("file", "link", "portal") else dep_version2
+    candidate_pkg_json = Path(ext_path) / clean_path / "package.json"
+    if ("/" in clean_path or "\\" in clean_path) and candidate_pkg_json.is_file():
+        try:
+            with candidate_pkg_json.open() as fid:
+                dep_version2 = str(json.load(fid).get("version", ""))
+        except (OSError, ValueError):
+            pass
     if not (Path(ext_path) / "node_modules").exists():
         subprocess.check_call(["jlpm"], cwd=ext_path)  # noqa: S607
 
